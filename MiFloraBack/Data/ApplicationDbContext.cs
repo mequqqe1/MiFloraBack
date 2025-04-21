@@ -41,7 +41,7 @@ namespace MiFloraBack.Data
 
             // Категории с подкатегориями
             modelBuilder.Entity<Category>()
-                .HasOne(c => c.ParentCategory)
+                .HasOne(c => c.Parent)
                 .WithMany(c => c.Subcategories)
                 .HasForeignKey(c => c.ParentId)
                 .OnDelete(DeleteBehavior.Restrict);

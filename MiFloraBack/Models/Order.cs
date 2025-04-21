@@ -10,23 +10,33 @@ namespace MiFloraBack.Models
         public Guid ShopId { get; set; }
         public Shop Shop { get; set; }
 
-        public Guid? DeliveryAddressId { get; set; }
-        public DeliveryAddress DeliveryAddress { get; set; }
+        // 👤 Клиент
+        [Required]
+        public string ClientName { get; set; }
 
-        public Guid? UserId { get; set; }
-        public User User { get; set; }
+        [Required]
+        public string Phone { get; set; }
 
-        public Guid? ClientId { get; set; }
-        public CorporateClient CorporateClient { get; set; }
+        public string? ClientComment { get; set; } // 🔧 fix
 
-        public bool IsCorporate { get; set; }
-        public DateTime? DeliveryDate { get; set; }
-        public string DeliveryTimeSlot { get; set; }
+        // 🚚 Доставка
+        [Required]
+        public string DeliveryType { get; set; } // courier | self_pickup
 
+        public string? Address { get; set; }
+        public DateTime? DeliveryTime { get; set; }
+
+        // 👤 Доп. инфа
+        public string? FloristName { get; set; } // 🔧 fix
+
+        // 💰 Финансы
+        public float Price { get; set; } = 0; // 🔧 fix
+        public string Status { get; set; } = "new";
+        public string PaymentStatus { get; set; } = "pending";
+
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        // 📦 Состав заказа
         public ICollection<OrderItem> OrderItems { get; set; }
-        public ICollection<Payment> Payments { get; set; }
-        public ICollection<DeliveryStatus> DeliveryStatuses { get; set; }
-        public ICollection<LoyaltyTransaction> LoyaltyTransactions { get; set; }
     }
-
 }

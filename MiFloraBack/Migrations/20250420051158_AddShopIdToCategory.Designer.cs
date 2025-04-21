@@ -3,6 +3,7 @@ using System;
 using MiFloraBack.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MiFloraBack.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250420051158_AddShopIdToCategory")]
+    partial class AddShopIdToCategory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -56,6 +59,9 @@ namespace MiFloraBack.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -63,14 +69,11 @@ namespace MiFloraBack.Migrations
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ShopId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("CategoryId");
 
-                    b.HasIndex("ParentId");
+                    b.HasIndex("BusinessId");
 
-                    b.HasIndex("ShopId");
+                    b.HasIndex("ParentId");
 
                     b.ToTable("Categories");
                 });
@@ -280,60 +283,40 @@ namespace MiFloraBack.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Address")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ClientComment")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ClientName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid?>("CorporateClientClientId")
+                    b.Property<Guid?>("ClientId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeliveryAddressAddressId")
+                    b.Property<Guid>("CorporateClientClientId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime?>("DeliveryTime")
+                    b.Property<Guid?>("DeliveryAddressId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("DeliveryDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DeliveryType")
+                    b.Property<string>("DeliveryTimeSlot")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("FloristName")
-                        .HasColumnType("text");
-
-                    b.Property<string>("PaymentStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<float>("Price")
-                        .HasColumnType("real");
+                    b.Property<bool>("IsCorporate")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ShopId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("OrderId");
 
                     b.HasIndex("CorporateClientClientId");
 
-                    b.HasIndex("DeliveryAddressAddressId");
+                    b.HasIndex("DeliveryAddressId");
 
                     b.HasIndex("ShopId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Orders");
                 });
@@ -760,20 +743,20 @@ namespace MiFloraBack.Migrations
 
             modelBuilder.Entity("Category", b =>
                 {
+                    b.HasOne("Business", "Business")
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("Category", "Parent")
                         .WithMany("Subcategories")
                         .HasForeignKey("ParentId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("MiFloraBack.Models.Shop", "Shop")
-                        .WithMany()
-                        .HasForeignKey("ShopId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                    b.Navigation("Business");
 
                     b.Navigation("Parent");
-
-                    b.Navigation("Shop");
                 });
 
             modelBuilder.Entity("MiFloraBack.Models.Branch", b =>
@@ -796,7 +779,7 @@ namespace MiFloraBack.Migrations
                         .IsRequired();
 
                     b.HasOne("MiFloraBack.Models.Order", "Order")
-                        .WithMany()
+                        .WithMany("DeliveryStatuses")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -826,7 +809,7 @@ namespace MiFloraBack.Migrations
                         .IsRequired();
 
                     b.HasOne("MiFloraBack.Models.Order", "Order")
-                        .WithMany()
+                        .WithMany("LoyaltyTransactions")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -838,13 +821,15 @@ namespace MiFloraBack.Migrations
 
             modelBuilder.Entity("MiFloraBack.Models.Order", b =>
                 {
-                    b.HasOne("MiFloraBack.Models.CorporateClient", null)
+                    b.HasOne("MiFloraBack.Models.CorporateClient", "CorporateClient")
                         .WithMany("Orders")
-                        .HasForeignKey("CorporateClientClientId");
+                        .HasForeignKey("CorporateClientClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.HasOne("MiFloraBack.Models.DeliveryAddress", null)
+                    b.HasOne("MiFloraBack.Models.DeliveryAddress", "DeliveryAddress")
                         .WithMany("Orders")
-                        .HasForeignKey("DeliveryAddressAddressId");
+                        .HasForeignKey("DeliveryAddressId");
 
                     b.HasOne("MiFloraBack.Models.Shop", "Shop")
                         .WithMany("Orders")
@@ -852,7 +837,17 @@ namespace MiFloraBack.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MiFloraBack.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId");
+
+                    b.Navigation("CorporateClient");
+
+                    b.Navigation("DeliveryAddress");
+
                     b.Navigation("Shop");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MiFloraBack.Models.OrderItem", b =>
@@ -877,7 +872,7 @@ namespace MiFloraBack.Migrations
             modelBuilder.Entity("MiFloraBack.Models.Payment", b =>
                 {
                     b.HasOne("MiFloraBack.Models.Order", "Order")
-                        .WithMany()
+                        .WithMany("Payments")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1087,7 +1082,13 @@ namespace MiFloraBack.Migrations
 
             modelBuilder.Entity("MiFloraBack.Models.Order", b =>
                 {
+                    b.Navigation("DeliveryStatuses");
+
+                    b.Navigation("LoyaltyTransactions");
+
                     b.Navigation("OrderItems");
+
+                    b.Navigation("Payments");
                 });
 
             modelBuilder.Entity("MiFloraBack.Models.Role", b =>
