@@ -4,12 +4,15 @@ using Microsoft.EntityFrameworkCore;
 using MiFloraBack.Data;
 using MiFloraBack.Models;
 using MiFloraBack.Models.DTOs;
-using System.Security.Claims;
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace MiFloraBack.Controllers
 {
     [ApiController]
-    [Route("catalog/items")]
+    [Route("api/products")]
     public class ProductsController : ControllerBase
     {
         private readonly ApplicationDbContext _db;
@@ -21,152 +24,142 @@ namespace MiFloraBack.Controllers
             _env = env;
         }
 
-        private Guid GetUserId() =>
-            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
-
-        // 🔍 Получить список товаров
+        // GET: api/products
         [HttpGet]
-        [Authorize]
-        public async Task<IActionResult> GetItems([FromQuery] string? search, [FromQuery] Guid? category_id, [FromQuery] bool? is_active)
+        public async Task<IActionResult> GetAll([FromQuery] Guid? categoryId, [FromQuery] string? search)
         {
-            var userId = GetUserId();
-            var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
-            if (shop == null)
-                return Forbid("У вас нет магазина");
+            var query = _db.Products.Include(p => p.Category).AsQueryable();
 
-            var query = _db.Products
-                .Where(p => p.ShopId == shop.ShopId)
-                .Include(p => p.Category)
-                .AsQueryable();
-
+            if (categoryId.HasValue)
+                query = query.Where(p => p.CategoryId == categoryId);
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(p => p.Name.Contains(search));
+                query = query.Where(p => p.Title.Contains(search));
 
-            if (category_id.HasValue)
-                query = query.Where(p => p.CategoryId == category_id);
+            var list = await query.ToListAsync();
 
-            if (is_active.HasValue)
-                query = query.Where(p => p.IsActive == is_active);
-
-            var items = await query.ToListAsync();
-
-            return Ok(new
+            var result = list.Select(p => new ProductResponseDto
             {
-                items = items.Select(p => new
-                {
-                    id = p.ProductId,
-                    name = p.Name,
-                    price = p.Price,
-                    category_id = p.CategoryId,
-                    image_url = p.ImageUrl,
-                    is_active = p.IsActive,
-                    stock = p.Stock,
-                    unit = p.Unit
-                }),
-                total = items.Count
+                Id = p.ProductId,
+                Title = p.Title,
+                CategoryId = p.CategoryId,
+                Height = p.Height,
+                Unit = p.Unit,
+                Description = p.Description,
+                ImageUrl = p.ImageUrl,
+                Price = p.Price,
+                IsActive = p.IsActive,
+                Stock = p.Stock
             });
+
+            return Ok(result);
         }
 
-        [HttpPost("upload")]
+        // GET: api/products/{id}
+        [HttpGet("{id:guid}")]
+        public async Task<IActionResult> GetById(Guid id)
+        {
+            var p = await _db.Products.FindAsync(id);
+            if (p == null) return NotFound();
+
+            var dto = new ProductResponseDto
+            {
+                Id = p.ProductId,
+                Title = p.Title,
+                CategoryId = p.CategoryId,
+                Height = p.Height,
+                Unit = p.Unit,
+                Description = p.Description,
+                ImageUrl = p.ImageUrl,
+                Price = p.Price,
+                IsActive = p.IsActive,
+                Stock = p.Stock
+            };
+            return Ok(dto);
+        }
+
+        // POST: api/products
+        [HttpPost]
         [Authorize(Roles = "owner")]
         [RequestSizeLimit(10 * 1024 * 1024)]
-        public async Task<IActionResult> CreateItemWithImage([FromForm] CreateProductWithImageDto dto)
+        public async Task<IActionResult> Create([FromForm] CreateProductDto dto)
         {
-            var userId = GetUserId();
+            if (!await _db.Categories.AnyAsync(c => c.CategoryId == dto.CategoryId))
+                return BadRequest("Категория не найдена");
 
-            var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
-            if (shop == null)
-                return Forbid("У вас нет магазина");
-
-            if (dto.Image == null || dto.Image.Length == 0)
-                return BadRequest("Файл изображения обязателен");
-
-            // 📁 Путь до wwwroot/uploads/products
-            var uploadsFolder = Path.Combine(_env.WebRootPath, "uploads", "products");
-            if (!Directory.Exists(uploadsFolder))
-                Directory.CreateDirectory(uploadsFolder);
-
-            var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
-            var fullPath = Path.Combine(uploadsFolder, fileName);
-
-            using (var stream = new FileStream(fullPath, FileMode.Create))
+            string? imagePath = null;
+            if (dto.Image != null)
             {
-                await dto.Image.CopyToAsync(stream);
+                var uploads = Path.Combine(_env.WebRootPath, "uploads/products");
+                Directory.CreateDirectory(uploads);
+                var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
+                var full = Path.Combine(uploads, fileName);
+                using var fs = new FileStream(full, FileMode.Create);
+                await dto.Image.CopyToAsync(fs);
+                imagePath = $"/uploads/products/{fileName}";
             }
 
-            var imagePath = $"/uploads/products/{fileName}";
-
-            var product = new Product
+            var prod = new Product
             {
                 ProductId = Guid.NewGuid(),
-                Name = dto.Name,
-                Description = dto.Description,
-                Price = dto.Price,
-                Stock = dto.Stock,
-                Unit = dto.Unit,
-                ImageUrl = imagePath,
-                IsActive = dto.IsActive,
+                Title = dto.Title,
                 CategoryId = dto.CategoryId,
-                ShopId = shop.ShopId,
-                ExpirationDate = dto.ExpirationDate,
-                BatchNumber = dto.BatchNumber
+                Height = dto.Height,
+                Unit = dto.Unit,
+                Description = dto.Description,
+                ImageUrl = imagePath,
+                Price = dto.Price,
+                IsActive = true,
+                Stock = 0
             };
 
-            await _db.Products.AddAsync(product);
+            _db.Products.Add(prod);
             await _db.SaveChangesAsync();
 
-            return Ok(new
+            return CreatedAtAction(nameof(GetById), new { id = prod.ProductId }, new { id = prod.ProductId });
+        }
+
+        // PUT: api/products/{id}
+        [HttpPut("{id:guid}")]
+        [Authorize(Roles = "owner")]
+        public async Task<IActionResult> Update(Guid id, [FromForm] UpdateProductDto dto)
+        {
+            var prod = await _db.Products.FindAsync(id);
+            if (prod == null) return NotFound();
+
+            if (dto.Title != null) prod.Title = dto.Title;
+            if (dto.CategoryId.HasValue) prod.CategoryId = dto.CategoryId.Value;
+            if (dto.Height.HasValue) prod.Height = dto.Height;
+            if (dto.Unit != null) prod.Unit = dto.Unit;
+            if (dto.Description != null) prod.Description = dto.Description;
+            if (dto.Price.HasValue) prod.Price = dto.Price.Value;
+            if (dto.IsActive.HasValue) prod.IsActive = dto.IsActive.Value;
+            if (dto.Stock.HasValue) prod.Stock = dto.Stock.Value;
+
+            if (dto.Image != null)
             {
-                id = product.ProductId,
-                message = "Товар успешно добавлен"
-            });
-        }
-
-
-
-        // ✏️ Обновить товар
-        [HttpPut("{id}")]
-        [Authorize(Roles = "owner")]
-        public async Task<IActionResult> UpdateItem(Guid id, [FromBody] UpdateProductDto dto)
-        {
-            var userId = GetUserId();
-            var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
-            if (shop == null)
-                return Forbid("У вас нет магазина");
-
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == id && p.ShopId == shop.ShopId);
-            if (product == null)
-                return NotFound("Товар не найден");
-
-            product.Stock = dto.Stock;
-            product.Price = dto.Price;
-            product.Unit = dto.Unit;
-            product.Description = dto.Description;
-            product.IsActive = dto.IsActive;
+                var uploads = Path.Combine(_env.WebRootPath, "uploads/products");
+                Directory.CreateDirectory(uploads);
+                var fileName = Guid.NewGuid() + Path.GetExtension(dto.Image.FileName);
+                var full = Path.Combine(uploads, fileName);
+                using var fs = new FileStream(full, FileMode.Create);
+                await dto.Image.CopyToAsync(fs);
+                prod.ImageUrl = $"/uploads/products/{fileName}";
+            }
 
             await _db.SaveChangesAsync();
-
-            return Ok(new { message = "Товар обновлён", code = 200 });
+            return NoContent();
         }
 
-        // ❌ Удалить товар
-        [HttpDelete("{id}")]
+        // DELETE: api/products/{id}
+        [HttpDelete("{id:guid}")]
         [Authorize(Roles = "owner")]
-        public async Task<IActionResult> DeleteItem(Guid id)
+        public async Task<IActionResult> Delete(Guid id)
         {
-            var userId = GetUserId();
-            var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
-            if (shop == null)
-                return Forbid("У вас нет магазина");
-
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.ProductId == id && p.ShopId == shop.ShopId);
-            if (product == null)
-                return NotFound("Товар не найден");
-
-            _db.Products.Remove(product);
+            var prod = await _db.Products.FindAsync(id);
+            if (prod == null) return NotFound();
+            _db.Products.Remove(prod);
             await _db.SaveChangesAsync();
-
-            return Ok(new { message = "Товар удалён", code = 200 });
+            return NoContent();
         }
     }
 }

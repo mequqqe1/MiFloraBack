@@ -1,6 +1,10 @@
-﻿namespace MiFloraBack.Models.DTOs;
+﻿using System;
 
-public class UpdateCategoryDto
+namespace MiFloraBack.Models.DTOs
 {
-    
+    public class UpdateCategoryDto
+    {
+        public string? Name { get; set; }
+        public Guid? ParentId { get; set; }
+    }
 }

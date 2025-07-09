@@ -1,31 +1,45 @@
-﻿using MiFloraBack.Models;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-public class Product
+namespace MiFloraBack.Models
 {
-    [Key]
-    public Guid ProductId { get; set; }
+    public class Product
+    {
+        [Key]
+        public Guid ProductId { get; set; }
 
-    public Guid ShopId { get; set; }
-    public Shop Shop { get; set; }
+        [Required]
+        public Guid ShopId { get; set; }
+        public Shop Shop { get; set; } = null!;
 
-    public Guid CategoryId { get; set; }
-    public Category Category { get; set; }
+        [Required]
+        public Guid CategoryId { get; set; }
+        public Category Category { get; set; } = null!;
 
-    public string Name { get; set; }
-    public string Description { get; set; }
-    public int Stock { get; set; }
-    public float Price { get; set; }
-    public string ImageUrl { get; set; }
+        [Required]
+        public string Title { get; set; } = null!;      // Название
 
-    public string Unit { get; set; }          // ✅ Добавить
-    public bool IsActive { get; set; }        // ✅ Добавить
+        public int? Height { get; set; }               // Высота (для отдельных категорий)
 
-    public DateTime? ExpirationDate { get; set; }
-    public string BatchNumber { get; set; }
+        [Required]
+        public string Unit { get; set; } = null!;       // Единица измерения (шт, банч)
 
-    public ICollection<StockMovement> StockMovements { get; set; }
-    public ICollection<Spoilage> Spoilages { get; set; }
-    public ICollection<OrderItem> OrderItems { get; set; }
-    public ICollection<Subscription> Subscriptions { get; set; }
+        public string? Description { get; set; }        // Описание
+        public string? ImageUrl { get; set; }           // URL изображения
+
+        [Required]
+        public decimal Price { get; set; }              // Цена (продажа)
+
+        public bool IsActive { get; set; } = true;      // Активность товара
+        public int Stock { get; set; } = 0;             // Остаток на складе
+
+        // Дополнительные отношения
+        public ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
+        public ICollection<Spoilage> Spoilages { get; set; } = new List<Spoilage>();
+        public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+        public ICollection<Subscription> Subscriptions { get; set; } = new List<Subscription>();
+        public ICollection<InvoiceItem> InvoiceItems { get; set; } = new List<InvoiceItem>();
+
+    }
 }

@@ -4,7 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using MiFloraBack.Data;
 using MiFloraBack.Models;
 using MiFloraBack.Models.DTOs;
+using System;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 
 namespace MiFloraBack.Controllers
 {
@@ -20,16 +23,14 @@ namespace MiFloraBack.Controllers
         }
 
         private Guid GetUserId() =>
-            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         [HttpGet("categories")]
         [Authorize]
         public async Task<IActionResult> GetCategories()
         {
             var userId = GetUserId();
-
-            var shop = await _db.Shops
-                .FirstOrDefaultAsync(s => s.OwnerId == userId);
+            var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
             if (shop == null)
                 return Forbid("Ты не владелец магазина");
 
@@ -57,7 +58,7 @@ namespace MiFloraBack.Controllers
                         items = subsub.Products.Select(p => new
                         {
                             id = p.ProductId,
-                            name = p.Name,
+                            title = p.Title,
                             price = p.Price,
                             image_url = p.ImageUrl,
                             is_active = p.IsActive,
@@ -68,7 +69,7 @@ namespace MiFloraBack.Controllers
                     items = sub.Products.Select(p => new
                     {
                         id = p.ProductId,
-                        name = p.Name,
+                        title = p.Title,
                         price = p.Price,
                         image_url = p.ImageUrl,
                         is_active = p.IsActive,
@@ -79,7 +80,7 @@ namespace MiFloraBack.Controllers
                 items = c.Products.Select(p => new
                 {
                     id = p.ProductId,
-                    name = p.Name,
+                    title = p.Title,
                     price = p.Price,
                     image_url = p.ImageUrl,
                     is_active = p.IsActive,
@@ -91,15 +92,11 @@ namespace MiFloraBack.Controllers
             return Ok(result);
         }
 
-
-        // ✅ POST /catalog/categories
         [HttpPost("categories")]
         [Authorize(Roles = "owner")]
         public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryDto dto)
         {
             var userId = GetUserId();
-
-            // Находим магазин, которым владеет текущий пользователь
             var shop = await _db.Shops.FirstOrDefaultAsync(s => s.OwnerId == userId);
             if (shop == null)
                 return Forbid("Ты не владелец ни одного магазина");
@@ -112,7 +109,7 @@ namespace MiFloraBack.Controllers
                 ShopId = shop.ShopId
             };
 
-            await _db.Categories.AddAsync(category);
+            _db.Categories.Add(category);
             await _db.SaveChangesAsync();
 
             return Ok(new
@@ -123,6 +120,5 @@ namespace MiFloraBack.Controllers
                 shop_id = category.ShopId
             });
         }
-
-        }
+    }
 }

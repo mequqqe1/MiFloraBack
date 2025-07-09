@@ -1,22 +1,22 @@
-﻿using MiFloraBack.Models;
+﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-public class Category
+namespace MiFloraBack.Models
 {
-    [Key]
-    public Guid CategoryId { get; set; }
-    public string Name { get; set; }
+    public class Category
+    {
+        [Key]
+        public Guid CategoryId { get; set; }
+        public string Name { get; set; } = null!;
 
-    public Guid? ParentId { get; set; }
-    public Category? Parent { get; set; }
-    public ICollection<Category> Subcategories { get; set; } = new List<Category>();
+        public Guid? ParentId { get; set; }
+        public Category? Parent { get; set; }
+        public ICollection<Category> Subcategories { get; set; } = new List<Category>();
 
-    public Guid ShopId { get; set; }
-    public Shop Shop { get; set; }
+        public Guid ShopId { get; set; }
+        public Shop Shop { get; set; } = null!;
 
-    // ✅ добавь это
-    public ICollection<Product> Products { get; set; } = new List<Product>();
+        public ICollection<Product> Products { get; set; } = new List<Product>();
+    }
 }
-
-
-
